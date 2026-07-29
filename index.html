@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Weighted List Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ── Reset & Variables ────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f1117;
+  --surface:   #181c27;
+  --surface2:  #1e2333;
+  --surface3:  #252b3b;
+  --border:    #2a3145;
+  --border2:   #333d55;
+  --accent:    #4f8ef7;
+  --accent2:   #6fa5ff;
+  --accent-bg: rgba(79,142,247,.10);
+  --green:     #3ecf8e;
+  --green-bg:  rgba(62,207,142,.10);
+  --red:       #f56565;
+  --red-bg:    rgba(245,101,101,.10);
+  --gold:      #f0b429;
+  --gold-bg:   rgba(240,180,41,.08);
+  --text:      #e2e8f7;
+  --text2:     #8892aa;
+  --text3:     #5a6480;
+  --radius:    10px;
+  --radius-sm: 6px;
+  --shadow:    0 4px 24px rgba(0,0,0,.4);
+  --shadow-sm: 0 2px 8px rgba(0,0,0,.3);
+  --font:      'DM Sans', sans-serif;
+  --mono:      'DM Mono', monospace;
+  --sidebar-w: 240px;
+  --transition: .18s ease;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.5; overflow: hidden; }
+
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+/* ── Layout ────────────────────────────────────── */
+#app { display: flex; height: 100vh; }
+
+/* ── Sidebar ───────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sidebar-header {
+  padding: 20px 16px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.logo {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+.logo svg { opacity: .8; }
+
+.btn-new-list {
+  width: 100%;
+  background: var(--accent-bg);
+  color: var(--accent2);
+  border: 1px solid rgba(79,142,247,.25);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all var(--transition);
+}
+.btn-new-list:hover { background: rgba(79,142,247,.18); border-color: var(--accent); }
+
+.sidebar-section-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--text3);
+  padding: 12px 16px 6px;
+}
+
+#list-nav { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+
+.list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition);
+  color: var(--text2);
+  font-size: 13.5px;
+  margin-bottom: 2px;
+}
+.list-item:hover { background: var(--surface2); color: var(--text); }
+.list-item.active { background: var(--accent-bg); color: var(--accent2); font-weight: 500; }
+
+.list-item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.list-actions { display: none; gap: 2px; }
+.list-item:hover .list-actions,
+.list-item.active .list-actions { display: flex; }
+
+.icon-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--text3); padding: 2px 4px; border-radius: 4px;
+  font-size: 12px; transition: all var(--transition);
+  display: flex; align-items: center;
+}
+.icon-btn:hover { background: var(--surface3); color: var(--text); }
+.icon-btn.danger:hover { background: var(--red-bg); color: var(--red); }
+
+.list-empty-state {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* ── Main ──────────────────────────────────────── */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+/* ── Topbar ────────────────────────────────────── */
+#topbar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+#list-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+#list-title.placeholder { color: var(--text3); font-weight: 400; }
+
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 14px; border-radius: var(--radius-sm);
+  font-family: var(--font); font-size: 13px; font-weight: 500;
+  cursor: pointer; border: 1px solid transparent;
+  transition: all var(--transition); white-space: nowrap;
+}
+.btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn-primary:hover { background: var(--accent2); border-color: var(--accent2); }
+.btn-secondary { background: var(--surface2); color: var(--text); border-color: var(--border2); }
+.btn-secondary:hover { background: var(--surface3); border-color: var(--border); }
+.btn-green { background: var(--green-bg); color: var(--green); border-color: rgba(62,207,142,.2); }
+.btn-green:hover { background: rgba(62,207,142,.18); }
+.btn-danger { background: var(--red-bg); color: var(--red); border-color: rgba(245,101,101,.2); }
+.btn-danger:hover { background: rgba(245,101,101,.18); }
+.btn:disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+
+/* divider */
+.topbar-divider { width: 1px; height: 20px; background: var(--border); margin: 0 2px; }
+
+/* ── Toolbar (filter row) ──────────────────────── */
+#toolbar {
+  padding: 10px 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+
+.search-wrap {
+  position: relative;
+  flex: 1;
+  max-width: 300px;
+}
+.search-wrap svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text3); pointer-events: none; }
+#filter-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 7px 12px 7px 32px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+#filter-input:focus { border-color: var(--accent); }
+#filter-input::placeholder { color: var(--text3); }
+
+.topn-wrap {
+  display: flex; align-items: center; gap: 8px;
+  color: var(--text2); font-size: 12.5px;
+}
+.topn-wrap input {
+  width: 44px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.topn-wrap input:focus { border-color: var(--accent); }
+
+.gold-badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--gold-bg); color: var(--gold);
+  border: 1px solid rgba(240,180,41,.2);
+  border-radius: 99px; padding: 2px 10px; font-size: 11.5px; font-weight: 500;
+}
+
+.stats-chip {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--text3);
+  font-family: var(--mono);
+}
+
+/* ── Table area ────────────────────────────────── */
+#table-wrap {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px 24px;
+}
+
+#data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+
+#data-table thead th {
+  background: var(--surface);
+  color: var(--text2);
+  font-weight: 500;
+  font-size: 12px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--transition);
+  text-align: left;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+#data-table thead th:hover { color: var(--text); }
+#data-table thead th.sorted { color: var(--accent2); }
+#data-table thead th .sort-arrow { margin-left: 4px; opacity: .5; font-size: 10px; }
+#data-table thead th.sorted .sort-arrow { opacity: 1; }
+
+#data-table tbody tr {
+  border-bottom: 1px solid var(--border);
+  transition: background var(--transition);
+  cursor: pointer;
+}
+#data-table tbody tr:hover td { background: var(--surface2) !important; }
+#data-table tbody tr.row-even td { background: var(--bg); }
+#data-table tbody tr.row-odd td { background: var(--surface); }
+#data-table tbody tr.top-row td { background: var(--gold-bg) !important; }
+#data-table tbody tr.top-row td { color: var(--text); }
+#data-table tbody tr.top-row td.score-cell { color: var(--gold); font-weight: 600; }
+
+#data-table td {
+  padding: 11px 14px;
+  vertical-align: middle;
+  transition: background var(--transition);
+}
+
+.item-name-cell { font-weight: 500; color: var(--text); }
+
+.value-cell { font-family: var(--mono); color: var(--text2); text-align: right; }
+.value-cell.blank { color: var(--text3); font-style: italic; }
+
+.score-cell {
+  font-family: var(--mono);
+  font-weight: 600;
+  text-align: right;
+  color: var(--accent2);
+}
+
+.score-bar-wrap { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+.score-bar {
+  width: 60px; height: 4px;
+  background: var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.score-bar-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  transition: width .4s ease;
+}
+.top-row .score-bar-fill { background: linear-gradient(90deg, #d4a017, var(--gold)); }
+
+.action-cell { text-align: right; white-space: nowrap; }
+.row-action {
+  background: none; border: none; cursor: pointer;
+  color: var(--text3); padding: 3px 6px; border-radius: 4px;
+  font-size: 12px; transition: all var(--transition);
+}
+.row-action:hover { background: var(--surface3); color: var(--text); }
+.row-action.del:hover { background: var(--red-bg); color: var(--red); }
+
+.rank-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--gold-bg); color: var(--gold);
+  font-size: 10px; font-weight: 700; margin-right: 6px;
+  border: 1px solid rgba(240,180,41,.3);
+}
+
+/* ── Empty / Placeholder states ─────────────────── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 80px 24px; text-align: center; color: var(--text3);
+}
+.empty-state svg { margin-bottom: 16px; opacity: .3; }
+.empty-state h3 { font-size: 16px; font-weight: 500; color: var(--text2); margin-bottom: 6px; }
+.empty-state p { font-size: 13px; line-height: 1.6; max-width: 320px; }
+
+/* ── Modal ─────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100; opacity: 0; pointer-events: none; transition: opacity .2s;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.open { opacity: 1; pointer-events: all; }
+
+.modal {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 520px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 64px);
+  overflow-y: auto;
+  transform: translateY(12px) scale(.98);
+  transition: transform .2s ease;
+}
+.modal-overlay.open .modal { transform: none; }
+
+.modal-header {
+  padding: 20px 24px 0;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-title { font-size: 16px; font-weight: 600; }
+.modal-close {
+  background: none; border: none; cursor: pointer;
+  color: var(--text3); font-size: 18px; line-height: 1; padding: 4px;
+  border-radius: 4px; transition: all var(--transition);
+}
+.modal-close:hover { background: var(--surface3); color: var(--text); }
+
+.modal-body { padding: 20px 24px; }
+.modal-footer { padding: 0 24px 20px; display: flex; gap: 10px; justify-content: flex-end; }
+
+/* Form */
+.form-group { margin-bottom: 16px; }
+.form-label {
+  display: block; font-size: 12px; font-weight: 500;
+  color: var(--text2); margin-bottom: 6px; letter-spacing: .03em;
+}
+.form-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 14px;
+  outline: none;
+  transition: border-color var(--transition);
+}
+.form-input:focus { border-color: var(--accent); }
+.form-input::placeholder { color: var(--text3); }
+.form-hint { font-size: 11.5px; color: var(--text3); margin-top: 4px; }
+
+.form-divider { height: 1px; background: var(--border); margin: 20px 0; }
+
+.fields-section-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text3); margin-bottom: 12px;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 90px auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.field-row .form-input { margin: 0; }
+.weight-input { font-family: var(--mono); text-align: center; }
+
+/* Drag handle */
+.drag-handle {
+  cursor: grab;
+  color: var(--text3);
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: color var(--transition);
+  touch-action: none;
+}
+.drag-handle:hover { color: var(--text2); }
+.drag-handle:active { cursor: grabbing; }
+
+/* Fields manager modal */
+.field-manager-row {
+  display: grid;
+  grid-template-columns: 20px 1fr 90px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.field-manager-row:last-child { border-bottom: none; }
+
+/* Drag-and-drop states */
+.drag-over-above { box-shadow: 0 -2px 0 var(--accent) !important; }
+.drag-over-below { box-shadow: 0 2px 0 var(--accent) !important; }
+.dragging-row { opacity: 0.4; background: var(--surface2) !important; }
+
+/* Table header drag */
+#data-table thead th.th-dragging { opacity: 0.4; }
+#data-table thead th.th-drag-over-left  { box-shadow: -3px 0 0 var(--accent) inset; }
+#data-table thead th.th-drag-over-right { box-shadow: 3px 0 0 var(--accent) inset; }
+
+/* ── Toast ─────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--surface3); color: var(--text);
+  border: 1px solid var(--border2);
+  padding: 10px 18px; border-radius: var(--radius);
+  font-size: 13px; font-weight: 500;
+  box-shadow: var(--shadow-sm);
+  transition: transform .25s ease, opacity .25s ease;
+  opacity: 0; z-index: 999; pointer-events: none; white-space: nowrap;
+}
+#toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+#toast.success { border-color: rgba(62,207,142,.3); color: var(--green); }
+#toast.error   { border-color: rgba(245,101,101,.3); color: var(--red);   }
+
+/* ── Misc ──────────────────────────────────────── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin .6s linear infinite;
+  display: inline-block;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.tag { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 99px; font-size: 11.5px; font-weight: 500; }
+.tag-gold { background: var(--gold-bg); color: var(--gold); border: 1px solid rgba(240,180,41,.2); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <nav id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+        </svg>
+        Weighted Lists
+      </div>
+      <button class="btn-new-list" onclick="showNewListModal()">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        New List
+      </button>
+    </div>
+    <div class="sidebar-section-label">My Lists</div>
+    <div id="list-nav"></div>
+  </nav>
+
+  <div id="main">
+    <div id="topbar">
+      <span id="list-title" class="placeholder">Select or create a list</span>
+      <div class="topbar-actions" id="topbar-actions" style="display:none">
+        <button class="btn btn-secondary" onclick="showFieldsModal()">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Manage Fields
+        </button>
+        <div class="topbar-divider"></div>
+        <button class="btn btn-green" onclick="showAddItemModal()">
+          <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+          Add Item
+        </button>
+      </div>
+    </div>
+
+    <div id="toolbar">
+      <div class="search-wrap">
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/></svg>
+        <input id="filter-input" type="text" placeholder="Filter items…" oninput="renderTable()" />
+      </div>
+      <div class="topn-wrap">
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        Highlight top
+        <input id="topn-input" type="number" value="3" min="1" max="999" oninput="renderTable()" />
+        <span class="gold-badge">
+          <svg width="10" height="10" fill="currentColor" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          gold
+        </span>
+      </div>
+      <div class="stats-chip" id="stats-chip"></div>
+    </div>
+
+    <div id="table-wrap">
+      <div class="empty-state" id="empty-state">
+        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+        </svg>
+        <h3>No list selected</h3>
+        <p>Create a new list from the sidebar, or select an existing one to get started.</p>
+      </div>
+      <table id="data-table" style="display:none">
+        <thead id="table-head"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-new-list">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">New List</span>
+      <button class="modal-close" onclick="closeModal('modal-new-list')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">List Name</label>
+        <input class="form-input" id="new-list-name" type="text" placeholder="e.g. Candidate Rankings, Project Ideas…" />
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-new-list')">Cancel</button>
+      <button class="btn btn-primary" onclick="createList()">Create List</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-fields">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">Manage Fields & Weights</span>
+      <button class="modal-close" onclick="closeModal('modal-fields')">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text2);font-size:13px;margin-bottom:16px;line-height:1.6">
+        Fields are shared across all items in this list. Weights determine each field's
+        contribution — the score is always normalized to <strong style="color:var(--text)">0–10</strong>.
+      </p>
+      <div id="fields-list"></div>
+      <div class="form-divider"></div>
+      <div class="fields-section-label">Add New Field</div>
+      <div class="field-row">
+        <input class="form-input" id="new-field-name" type="text" placeholder="Field name" />
+        <input class="form-input weight-input" id="new-field-weight" type="number" value="1.0" step="0.1" min="0.01" placeholder="Weight" />
+        <button class="btn btn-green" onclick="addField()" style="white-space:nowrap">+ Add</button>
+      </div>
+      <p class="form-hint">Weight can be any positive number — values are normalized automatically.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="closeModal('modal-fields');loadItems()">Done</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modal-item">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="item-modal-title">Add Item</span>
+      <button class="modal-close" onclick="closeModal('modal-item')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Item Name</label>
+        <input class="form-input" id="item-name-input" type="text" placeholder="Enter item name…" />
+      </div>
+      <div class="form-divider"></div>
+      <div class="fields-section-label">Field Values <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--text3)">— enter 0 or leave blank to exclude</span></div>
+      <div id="item-field-inputs"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modal-item')">Cancel</button>
+      <button class="btn btn-primary" onclick="saveItem()">Save Item</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────
+const state = {
+  lists: [],
+  currentListId: null,
+  fields: [],
+  items: [],
+  sortCol: 'score',
+  sortDesc: true,
+  editingItemId: null,
+};
+
+// ── API helpers ────────────────────────────────────────────────────────
+async function api(method, path, body = null) {
+  const opts = {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch('/api' + path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed');
+  return data;
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type = '') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'show ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 2800);
+}
+
+// ── Modal helpers ──────────────────────────────────────────────────────
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+});
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+});
+
+// ── Lists (sidebar) ────────────────────────────────────────────────────
+async function loadLists() {
+  state.lists = await api('GET', '/lists');
+  renderSidebar();
+}
+
+function renderSidebar() {
+  const nav = document.getElementById('list-nav');
+  if (!state.lists.length) {
+    nav.innerHTML = '<div class="list-empty-state">No lists yet.<br/>Click <strong>New List</strong> to get started.</div>';
+    return;
+  }
+  nav.innerHTML = state.lists.map(l => `
+    <div class="list-item ${l.id === state.currentListId ? 'active' : ''}" onclick="selectList(${l.id})">
+      <span class="list-item-name">${escHtml(l.name)}</span>
+      <span class="list-actions">
+        <button class="icon-btn" title="Rename" onclick="event.stopPropagation(); renameList(${l.id})">
+          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        </button>
+        <button class="icon-btn danger" title="Delete" onclick="event.stopPropagation(); deleteList(${l.id})">
+          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6l-1 14H6L5 6m5 0V4h4v2"/></svg>
+        </button>
+      </span>
+    </div>
+  `).join('');
+}
+
+function showNewListModal() {
+  document.getElementById('new-list-name').value = '';
+  openModal('modal-new-list');
+  setTimeout(() => document.getElementById('new-list-name').focus(), 50);
+}
+document.getElementById('new-list-name').addEventListener('keydown', e => { if (e.key === 'Enter') createList(); });
+
+async function createList() {
+  const name = document.getElementById('new-list-name').value.trim();
+  if (!name) return;
+  try {
+    const list = await api('POST', '/lists', { name });
+    closeModal('modal-new-list');
+    await loadLists();
+    selectList(list.id);
+    showToast(`List "${name}" created`, 'success');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function renameList(id) {
+  const list = state.lists.find(l => l.id === id);
+  if (!list) return;
+  const newName = prompt('Rename list:', list.name);
+  if (!newName || !newName.trim() || newName.trim() === list.name) return;
+  try {
+    await api('PUT', `/lists/${id}`, { name: newName.trim() });
+    await loadLists();
+    if (state.currentListId === id) document.getElementById('list-title').textContent = newName.trim();
+    showToast('List renamed', 'success');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteList(id) {
+  const list = state.lists.find(l => l.id === id);
+  if (!list) return;
+  if (!confirm(`Delete "${list.name}" and all its data? This cannot be undone.`)) return;
+  await api('DELETE', `/lists/${id}`);
+  if (state.currentListId === id) {
+    state.currentListId = null;
+    state.fields = []; state.items = [];
+    document.getElementById('list-title').textContent = 'Select or create a list';
+    document.getElementById('list-title').className = 'placeholder';
+    document.getElementById('topbar-actions').style.display = 'none';
+    document.getElementById('stats-chip').textContent = '';
+    showEmptyState(true);
+  }
+  await loadLists();
+  showToast('List deleted');
+}
+
+async function selectList(id) {
+  const list = state.lists.find(l => l.id === id);
+  if (!list) return;
+  state.currentListId = id;
+  state.sortCol = 'score';
+  state.sortDesc = true;
+  document.getElementById('list-title').textContent = list.name;
+  document.getElementById('list-title').className = '';
+  document.getElementById('topbar-actions').style.display = '';
+  document.getElementById('filter-input').value = '';
+  renderSidebar();
+  await loadItems();
+}
+
+// ── Fields ─────────────────────────────────────────────────────────────
+async function showFieldsModal() {
+  if (!state.currentListId) return;
+  state.fields = await api('GET', `/lists/${state.currentListId}/fields`);
+  renderFieldsModal();
+  openModal('modal-fields');
+}
+
+function renderFieldsModal() {
+  const container = document.getElementById('fields-list');
+  if (!state.fields.length) {
+    container.innerHTML = '<p style="color:var(--text3);font-size:13px;text-align:center;padding:12px 0">No fields yet.</p>';
+    return;
+  }
+  container.innerHTML = `
+    <div style="display:grid;grid-template-columns:20px 1fr 90px auto;gap:8px;margin-bottom:6px">
+      <span></span>
+      <span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)">Field Name</span>
+      <span style="font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text3)">Weight</span>
+      <span></span>
+    </div>
+    ${state.fields.map(f => `
+      <div class="field-manager-row" id="frow-${f.id}" draggable="true" data-fid="${f.id}">
+        <span class="drag-handle" title="Drag to reorder">
+          <svg width="12" height="14" viewBox="0 0 12 14" fill="currentColor">
+            <circle cx="3.5" cy="2.5" r="1.5"/><circle cx="8.5" cy="2.5" r="1.5"/>
+            <circle cx="3.5" cy="7" r="1.5"/><circle cx="8.5" cy="7" r="1.5"/>
+            <circle cx="3.5" cy="11.5" r="1.5"/><circle cx="8.5" cy="11.5" r="1.5"/>
+          </svg>
+        </span>
+        <input class="form-input" value="${escHtml(f.name)}" onblur="updateField(${f.id},'name',this.value)" style="font-size:13px" />
+        <input class="form-input weight-input" type="number" value="${f.weight}" step="0.1" min="0.01" onblur="updateField(${f.id},'weight',this.value)" style="font-size:13px" />
+        <button class="btn btn-danger" style="padding:6px 10px" onclick="deleteField(${f.id})">
+          <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path stroke-linecap="round" stroke-linejoin="round" d="M19 6l-1 14H6L5 6m5 0V4h4v2"/></svg>
+        </button>
+      </div>
+    `).join('')}
+  `;
+  initFieldRowDrag(container);
+}
+
+function initFieldRowDrag(container) {
+  let dragSrc = null;
+
+  container.querySelectorAll('.field-manager-row').forEach(row => {
+    row.addEventListener('dragstart', e => {
+      dragSrc = row;
+      row.classList.add('dragging-row');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', row.dataset.fid);
+    });
+    row.addEventListener('dragend', () => {
+      row.classList.remove('dragging-row');
+      container.querySelectorAll('.field-manager-row').forEach(r => {
+        r.classList.remove('drag-over-above', 'drag-over-below');
+      });
+    });
+    row.addEventListener('dragover', e => {
+      e.preventDefault();
+      if (row === dragSrc) return;
+      const rect = row.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      container.querySelectorAll('.field-manager-row').forEach(r => {
+        r.classList.remove('drag-over-above', 'drag-over-below');
+      });
+      if (e.clientY < mid) row.classList.add('drag-over-above');
+      else row.classList.add('drag-over-below');
+    });
+    row.addEventListener('dragleave', () => {
+      row.classList.remove('drag-over-above', 'drag-over-below');
+    });
+    row.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (!dragSrc || dragSrc === row) return;
+      row.classList.remove('drag-over-above', 'drag-over-below');
+      const rect = row.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      const insertBefore = e.clientY < mid;
+
+      // Reorder state.fields
+      const srcId = parseInt(dragSrc.dataset.fid);
+      const tgtId = parseInt(row.dataset.fid);
+      const srcIdx = state.fields.findIndex(f => f.id === srcId);
+      const tgtIdx = state.fields.findIndex(f => f.id === tgtId);
+      const [moved] = state.fields.splice(srcIdx, 1);
+      const newTgtIdx = state.fields.findIndex(f => f.id === tgtId);
+      state.fields.splice(insertBefore ? newTgtIdx : newTgtIdx + 1, 0, moved);
+
+      // Persist
+      await saveFieldOrder();
+      renderFieldsModal();
+    });
+  });
+}
+
+async function saveFieldOrder() {
+  try {
+    await api('PUT', `/lists/${state.currentListId}/fields/reorder`, {
+      order: state.fields.map(f => f.id)
+    });
+  } catch (err) { showToast('Failed to save field order', 'error'); }
+}
+
+async function addField() {
+  const name = document.getElementById('new-field-name').value.trim();
+  const weight = parseFloat(document.getElementById('new-field-weight').value);
+  if (!name) { showToast('Enter a field name', 'error'); return; }
+  if (isNaN(weight) || weight <= 0) { showToast('Weight must be a positive number', 'error'); return; }
+  try {
+    const f = await api('POST', `/lists/${state.currentListId}/fields`, { name, weight });
+    state.fields.push(f);
+    document.getElementById('new-field-name').value = '';
+    document.getElementById('new-field-weight').value = '1.0';
+    renderFieldsModal();
+    showToast(`Field "${name}" added`, 'success');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function updateField(id, key, val) {
+  const body = {};
+  if (key === 'weight') {
+    const w = parseFloat(val);
+    if (isNaN(w) || w <= 0) { showToast('Invalid weight', 'error'); return; }
+    body.weight = w;
+  } else {
+    if (!val.trim()) return;
+    body.name = val.trim();
+  }
+  try {
+    const updated = await api('PUT', `/fields/${id}`, body);
+    const i = state.fields.findIndex(f => f.id === id);
+    if (i >= 0) state.fields[i] = updated;
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteField(id) {
+  if (!confirm('Delete this field and all its values?')) return;
+  await api('DELETE', `/fields/${id}`);
+  state.fields = state.fields.filter(f => f.id !== id);
+  renderFieldsModal();
+  showToast('Field deleted');
+}
+
+// ── Items ───────────────────────────────────────────────────────────────
+async function loadItems() {
+  if (!state.currentListId) return;
+  state.fields = await api('GET', `/lists/${state.currentListId}/fields`);
+  state.items  = await api('GET', `/lists/${state.currentListId}/items`);
+  renderTable();
+}
+
+function showEmptyState(show) {
+  document.getElementById('empty-state').style.display = show ? '' : 'none';
+  document.getElementById('data-table').style.display  = show ? 'none' : '';
+}
+
+function renderTable() {
+  const filt  = document.getElementById('filter-input').value.trim().toLowerCase();
+  const topN  = parseInt(document.getElementById('topn-input').value) || 3;
+  const fields = state.fields;
+
+  let items = state.items.filter(it => !filt || it.name.toLowerCase().includes(filt));
+
+  if (!items.length) {
+    if (!state.fields.length && !state.items.length) {
+      document.getElementById('empty-state').innerHTML = `
+        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/>
+        </svg>
+        <h3>List is empty</h3>
+        <p>Click <strong>Manage Fields</strong> to define your scoring criteria, then <strong>Add Item</strong> to start ranking.</p>`;
+      showEmptyState(true);
+    } else if (!state.items.length) {
+      document.getElementById('empty-state').innerHTML = `
+        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        <h3>No items yet</h3>
+        <p>Click <strong>Add Item</strong> to start adding entries to this list.</p>`;
+      showEmptyState(true);
+    } else {
+      document.getElementById('empty-state').innerHTML = `
+        <svg width="48" height="48" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2">
+          <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/>
+        </svg>
+        <h3>No matches</h3>
+        <p>No items match "<strong>${escHtml(filt)}</strong>".</p>`;
+      showEmptyState(true);
+    }
+    document.getElementById('stats-chip').textContent = '';
+    return;
+  }
+
+  showEmptyState(false);
+
+  // Sort
+  items = [...items].sort((a, b) => {
+    let va, vb;
+    if (state.sortCol === 'score') { va = a.score; vb = b.score; }
+    else if (state.sortCol === 'name') { va = a.name.toLowerCase(); vb = b.name.toLowerCase(); }
+    else {
+      const fid = parseInt(state.sortCol);
+      va = a.values[fid] ?? -Infinity;
+      vb = b.values[fid] ?? -Infinity;
+    }
+    if (va < vb) return state.sortDesc ? 1 : -1;
+    if (va > vb) return state.sortDesc ? -1 : 1;
+    return 0;
+  });
+
+  // Top-N by score (from unsorted/unfiltered)
+  const sorted = [...items].sort((a,b) => b.score - a.score);
+  const topIds = new Set(sorted.slice(0, topN).filter(i => i.score > 0).map(i => i.id));
+  // rank map for badge
+  const rankMap = {};
+  sorted.forEach((it, idx) => { if (it.score > 0) rankMap[it.id] = idx + 1; });
+
+  // Header
+  const head = document.getElementById('table-head');
+  const sa = state.sortCol, sd = state.sortDesc;
+
+  // Build header TH elements with both sort click AND drag-to-reorder
+  const thFixedStart = `<th data-col="name" draggable="false" onclick="sortBy('name')" class="${sa==='name'?'sorted':''}">Item<span class="sort-arrow">${sa==='name'?(sd?'↓':'↑'):'↕'}</span></th>`;
+  const thFields = fields.map(f => {
+    const col = String(f.id);
+    const active = sa === col;
+    const arrow = active ? (sd ? '↓' : '↑') : '↕';
+    return `<th data-col="${col}" data-fid="${f.id}" draggable="true"
+      onclick="sortBy('${col}')"
+      class="${active ? 'sorted' : ''}"
+      >${escHtml(f.name)} <span style="color:var(--text3);font-weight:400">×${f.weight}</span><span class="sort-arrow">${arrow}</span></th>`;
+  }).join('');
+  const thFixedEnd = `<th data-col="score" draggable="false" onclick="sortBy('score')" class="${sa==='score'?'sorted':''}">Score /10<span class="sort-arrow">${sa==='score'?(sd?'↓':'↑'):'↕'}</span></th>
+    <th style="width:80px"></th>`;
+
+  head.innerHTML = `<tr>${thFixedStart}${thFields}${thFixedEnd}</tr>`;
+  initColumnDrag(head);
+
+  // Rows
+  const body = document.getElementById('table-body');
+  body.innerHTML = items.map((item, i) => {
+    const isTop = topIds.has(item.id);
+    const rank  = rankMap[item.id];
+    const rowClass = isTop ? 'top-row' : (i % 2 === 0 ? 'row-even' : 'row-odd');
+    const nameBadge = isTop && rank <= 3 ? `<span class="rank-badge">${rank}</span>` : '';
+    const valueCells = fields.map(f => {
+      const v = item.values[String(f.id)];
+      const blank = v === undefined || v === null || v === 0;
+      return `<td class="value-cell ${blank ? 'blank' : ''}">${blank ? '—' : v}</td>`;
+    }).join('');
+    const barPct = Math.min(100, item.score * 10);
+    const scoreCell = `
+      <td class="score-cell">
+        <div class="score-bar-wrap">
+          <div class="score-bar"><div class="score-bar-fill" style="width:${barPct}%"></div></div>
+          ${item.score.toFixed(2)}
+        </div>
+      </td>`;
+    return `<tr class="${rowClass}" ondblclick="showEditItemModal(${item.id})">
+      <td class="item-name-cell">${nameBadge}${escHtml(item.name)}</td>
+      ${valueCells}
+      ${scoreCell}
+      <td class="action-cell">
+        <button class="row-action" title="Edit" onclick="showEditItemModal(${item.id})">✏</button>
+        <button class="row-action del" title="Delete" onclick="deleteItem(${item.id})">✕</button>
+      </td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('stats-chip').textContent =
+    `${items.length} item${items.length !== 1 ? 's' : ''}  ·  ${fields.length} field${fields.length !== 1 ? 's' : ''}`;
+}
+
+function sortBy(col) {
+  if (state.sortCol === col) state.sortDesc = !state.sortDesc;
+  else { state.sortCol = col; state.sortDesc = true; }
+  renderTable();
+}
+
+function initColumnDrag(head) {
+  let dragSrcTh = null;
+  let dragMoved = false;
+
+  head.querySelectorAll('th[draggable="true"]').forEach(th => {
+    th.addEventListener('dragstart', e => {
+      dragSrcTh = th;
+      dragMoved = false;
+      th.classList.add('th-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', th.dataset.fid);
+    });
+
+    th.addEventListener('dragend', () => {
+      th.classList.remove('th-dragging');
+      head.querySelectorAll('th').forEach(t => t.classList.remove('th-drag-over-left', 'th-drag-over-right'));
+      // Only trigger sort if it wasn't a drag
+      if (!dragMoved) {
+        sortBy(th.dataset.col);
+      }
+    });
+
+    th.addEventListener('dragover', e => {
+      e.preventDefault();
+      dragMoved = true;
+      if (th === dragSrcTh) return;
+      head.querySelectorAll('th').forEach(t => t.classList.remove('th-drag-over-left', 'th-drag-over-right'));
+      const rect = th.getBoundingClientRect();
+      if (e.clientX < rect.left + rect.width / 2) th.classList.add('th-drag-over-left');
+      else th.classList.add('th-drag-over-right');
+    });
+
+    th.addEventListener('dragleave', () => {
+      th.classList.remove('th-drag-over-left', 'th-drag-over-right');
+    });
+
+    th.addEventListener('drop', async e => {
+      e.preventDefault();
+      if (!dragSrcTh || dragSrcTh === th) return;
+      th.classList.remove('th-drag-over-left', 'th-drag-over-right');
+
+      const rect = th.getBoundingClientRect();
+      const insertBefore = e.clientX < rect.left + rect.width / 2;
+
+      const srcFid = parseInt(dragSrcTh.dataset.fid);
+      const tgtFid = parseInt(th.dataset.fid);
+      const srcIdx = state.fields.findIndex(f => f.id === srcFid);
+      const tgtIdx = state.fields.findIndex(f => f.id === tgtFid);
+
+      const [moved] = state.fields.splice(srcIdx, 1);
+      const newTgtIdx = state.fields.findIndex(f => f.id === tgtFid);
+      state.fields.splice(insertBefore ? newTgtIdx : newTgtIdx + 1, 0, moved);
+
+      await saveFieldOrder();
+      renderTable();
+    });
+  });
+}
+
+// ── Add / Edit Item Modal ───────────────────────────────────────────────
+function showAddItemModal() {
+  if (!state.currentListId) return;
+  if (!state.fields.length) {
+    showToast('Add fields first via Manage Fields', 'error'); return;
+  }
+  state.editingItemId = null;
+  document.getElementById('item-modal-title').textContent = 'Add Item';
+  document.getElementById('item-name-input').value = '';
+  buildItemFieldInputs({});
+  openModal('modal-item');
+  setTimeout(() => document.getElementById('item-name-input').focus(), 50);
+}
+
+function showEditItemModal(itemId) {
+  const item = state.items.find(i => i.id === itemId);
+  if (!item) return;
+  state.editingItemId = itemId;
+  document.getElementById('item-modal-title').textContent = 'Edit Item';
+  document.getElementById('item-name-input').value = item.name;
+  buildItemFieldInputs(item.values);
+  openModal('modal-item');
+}
+
+function buildItemFieldInputs(values) {
+  const container = document.getElementById('item-field-inputs');
+  container.innerHTML = state.fields.map(f => {
+    const v = values[String(f.id)];
+    const display = (!v || v === 0) ? '' : v;
+    return `
+      <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:end;margin-bottom:12px">
+        <div>
+          <label class="form-label">${escHtml(f.name)} <span style="color:var(--text3);font-weight:400">weight: ${f.weight}</span></label>
+          <input class="form-input" type="number" id="fval-${f.id}" min="0" max="10" step="0.1"
+            placeholder="0 – 10" value="${display}" />
+        </div>
+        <div style="font-size:11.5px;color:var(--text3);padding-bottom:2px">
+          0 or blank = excluded from score
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function saveItem() {
+  const name = document.getElementById('item-name-input').value.trim();
+  if (!name) { showToast('Item name is required', 'error'); return; }
+
+  const values = {};
+  for (const f of state.fields) {
+    const raw = document.getElementById(`fval-${f.id}`).value.trim();
+    if (!raw || raw === '0') { values[f.id] = 0; continue; }
+    const v = parseFloat(raw);
+    if (isNaN(v)) { showToast(`Invalid value for "${f.name}"`, 'error'); return; }
+    if (v < 0 || v > 10) { showToast(`"${f.name}" must be 0–10`, 'error'); return; }
+    values[f.id] = v;
+  }
+
+  try {
+    if (state.editingItemId) {
+      const updated = await api('PUT', `/items/${state.editingItemId}`, { name, values });
+      const idx = state.items.findIndex(i => i.id === state.editingItemId);
+      if (idx >= 0) state.items[idx] = { ...state.items[idx], name: updated.name, values: updated.values, score: updated.score };
+    } else {
+      const item = await api('POST', `/lists/${state.currentListId}/items`, { name, values });
+      state.items.push(item);
+    }
+    closeModal('modal-item');
+    renderTable();
+    showToast(state.editingItemId ? 'Item updated' : 'Item added', 'success');
+  } catch (err) { showToast(err.message, 'error'); }
+}
+
+async function deleteItem(id) {
+  const item = state.items.find(i => i.id === id);
+  if (!item) return;
+  if (!confirm(`Delete "${item.name}"?`)) return;
+  await api('DELETE', `/items/${id}`);
+  state.items = state.items.filter(i => i.id !== id);
+  renderTable();
+  showToast('Item deleted');
+}
+
+// ── Utility ────────────────────────────────────────────────────────────
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// Enter key support in item modal
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('modal-item').classList.contains('open')) {
+    if (e.target.tagName !== 'BUTTON') saveItem();
+  }
+});
+
+// ── Boot ───────────────────────────────────────────────────────────────
+loadLists();
+</script>
+</body>
+</html>
