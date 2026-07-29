@@ -1,7 +1,8 @@
 # Weighted List Manager
 
-A professional dark-themed web app for scoring and ranking items using
+A dark-themed web app for scoring and ranking items using
 user-defined fields and weights. Runs entirely on your local machine.
+This is an early practice project for agentic workflows.
 
 ## Requirements
 
